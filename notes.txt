@@ -1,0 +1,54 @@
+R SIM
+
+FILE SPEC
+- Each tile in the file is represented by two values.
+- The first value represents the tile type
+- The second is only used for input and output to reference the truth table
+- A line starting with three equals signs signifys a header
+- Blank lines are ignored
+
+TILE TYPES
+0: Air
+- Delay+: 0
+- Expense: 0
+- Does nothing
+
+1: Wire
+- Delay+: 0
+- Expense: 1
+- No wires = auto fail
+- In 2D mode
+  - Same power as any wire with in left right up and down
+
+2: Inverter
+- Delay+: 1
+- Expense: 1
+- In 2D mode
+  - Will only invert to a wire directly across from input wire
+- In 3D mode
+  - Powers block above
+  - Powers all wires up down left right forward and behind
+
+3: Repeater
+- Delay+: 2
+- Expense: 1
+- Not for initial versions
+
+4: Input
+- Delay+: 0
+- Expense: 0
+- Sets any nearby wires to this power state according to the current truth.
+- If an input does not have a wire as a neighbor, auto fail
+
+5: Output
+- Delay+: 0
+- Expense: 0
+- Takes in an input to compare to the current truth.
+- If truth is off, then it should stay off or fail.
+- If the truth is on, then it should turn on then stay on.
+- If an output does not have a wire as a neighbor, auto fail
+
+6: Block
+- Delay+: 0
+- Expense: 1
+- Not enabled in 2D
