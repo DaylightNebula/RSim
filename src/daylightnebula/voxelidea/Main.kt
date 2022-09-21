@@ -59,7 +59,11 @@ fun loadTemplate(file: File): Template {
                 LoaderState.TEMPLATE -> {
                     val tokens = line.split(" ")
                     // yes I know this is a mess, just go with it
-                    currentTemplate.add(tokens.map { TileInstance(it.first().digitToInt(), it.last().digitToInt(), false) }.toTypedArray())
+                    currentTemplate.add(
+                        tokens.mapIndexed { index, it ->
+                            TileInstance(it.first().digitToInt(), it.last().digitToInt(), false, currentTemplate.size, index)
+                        }.toTypedArray()
+                    )
                 }
                 LoaderState.TRUTHS -> {
                     val inAndOut = line.split("=")
@@ -86,14 +90,9 @@ fun loadTemplate(file: File): Template {
 fun main() {
     val templateFile = File(System.getProperty("user.dir"), "res/test_design.rstemplate")
     val template = loadTemplate(templateFile)
-    println("Truth table")
-    for (truth in template.truths) {
-        for (input in truth.inputs) {
-            print("$input ")
-        }
-        print("= ")
-        for (output in truth.outputs)
-            print("$output ")
-        println()
-    }
+    val result = Simulator.simulate(template, true)
+    if (result)
+        println("Passed! :)")
+    else
+        println("Failed! :(")
 }
