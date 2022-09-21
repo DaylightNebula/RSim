@@ -59,6 +59,10 @@ class AirProcessor: TileProcessor(0) {
 
 class WireProcessor: TileProcessor(1) {
     override fun preprocess(simData: SimData, me: TileInstance, sides: Array<TileInstance>): Boolean {
+        return true
+    }
+
+    override fun tickTask(simData: SimData, me: TileInstance, sides: Array<TileInstance>): Boolean {
         sides.forEach { tile ->
             // if tile is not input and its state does not equal my state
             if (tile.tileID != 4 && tile.state != me.state) {
@@ -70,10 +74,6 @@ class WireProcessor: TileProcessor(1) {
         return true
     }
 
-    override fun tickTask(simData: SimData, me: TileInstance, sides: Array<TileInstance>): Boolean {
-        return true
-    }
-
     override fun checkPass(simData: SimData, me: TileInstance): Boolean {
         return true
     }
@@ -81,20 +81,21 @@ class WireProcessor: TileProcessor(1) {
 
 class InputProcessor: TileProcessor(4) {
     override fun preprocess(simData: SimData, me: TileInstance, sides: Array<TileInstance>): Boolean {
+        val truth = simData.template.truths[simData.truth].inputs[me.data]
+        if (truth)
+            sides.forEach {
+                if (it.tileID == 1) {
+                    // set wires state to my truth
+                    it.state = truth
+
+                    // call wires tick task
+                    simData.tickTasks.add(TickTask(it, simData.currentTick))
+                }
+            }
         return sides.any { it.tileID == 1 }
     }
 
     override fun tickTask(simData: SimData, me: TileInstance, sides: Array<TileInstance>): Boolean {
-        val truth = simData.template.truths[simData.truth].inputs[me.data]
-        sides.forEach {
-            if (it.tileID == 1) {
-                // set wires state to my truth
-                it.state = truth
-
-                // call wires tick task
-                simData.tickTasks.add(TickTask(it, simData.currentTick))
-            }
-        }
         return true
     }
 

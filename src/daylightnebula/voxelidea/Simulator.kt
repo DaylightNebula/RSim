@@ -5,10 +5,11 @@ object Simulator {
 
     fun simulate(template: Template, printData: Boolean = false): Boolean {
         // loop through each truth to run each
-        repeat(template.truths.size) { truth ->
+        for (truth in template.truths.indices) {
+
             // start timer
             val startTime = System.currentTimeMillis()
-            if (printData) println("[SIM] Starting simulation for truth $truth")
+            if (printData) println("[SIM-TRUTH-${truth}] Starting simulation for truth $truth")
 
             // build sim data
             val simData = SimData(truth, 0, mutableListOf(), template)
@@ -26,19 +27,25 @@ object Simulator {
                             specialGet(template.tiles, arrIndex + 1, index),
                         )
                     )
-                    if (!success) return false
+                    if (!success) {
+                        if (printData) println("[SIM-TRUTH-${truth}] Failing pre process on truth $truth")
+                        return false
+                    }
                 }
             }
 
             // timer stuff
             val preprocessTime = System.currentTimeMillis()
-            if (printData) println("[SIM] Passed preprocess for truth $truth in ${preprocessTime - startTime} MS")
+            if (printData) println("[SIM-TRUTH-${truth}] Passed preprocess for truth $truth in ${preprocessTime - startTime} MS")
 
+            println("[SIM-TRUTH-${truth}-TICK-${simData.currentTick}] starting with ${simData.tickTasks.size} tick tasks")
             while (simData.tickTasks.size > 0) {
 
                 // while loop until there are no tick tasks left for the current tick
+                println("[SIM-TRUTH-${truth}-TICK-${simData.currentTick}] currently have ${simData.tickTasks.count { it.tick == simData.currentTick }} waiting tasks")
                 while (simData.tickTasks.count { it.tick == simData.currentTick } > 0) {
-                    simData.tickTasks.filter { it.tick == simData.currentTick }.forEach {
+                    val tasks = simData.tickTasks.filter { it.tick == simData.currentTick }
+                    tasks.forEach {
                         val result = TileProcessor.get(it.tile.tileID).tickTask(
                             simData,
                             it.tile,
@@ -49,8 +56,13 @@ object Simulator {
                                 specialGet(template.tiles, it.tile.arrIndex + 1, it.tile.index),
                             )
                         )
-                        if (!result) return false
+                        println("[SIM-TRUTH-${truth}-TICK-${simData.currentTick}] Ticked task for (${it.tile.tileID}, ${it.tile.index} ${it.tile.arrIndex})")
+                        if (!result) {
+                            if (printData) println("[SIM-TRUTH-${truth}] Failing on truth $truth")
+                            return false
+                        }
                     }
+                    simData.tickTasks.removeAll(tasks)
                 }
 
                 // remove any tick tasks that are too old
@@ -62,18 +74,21 @@ object Simulator {
 
             // timer stuff
             val mainLoopTime = System.currentTimeMillis()
-            if (printData) println("[SIM] Passed main loop for truth $truth in ${mainLoopTime - preprocessTime} MS")
+            if (printData) println("[SIM-TRUTH-${truth}] Passed main loop for truth $truth in ${mainLoopTime - preprocessTime} MS")
 
             // check pass loop
             template.tiles.forEach { arr ->
                 arr.forEach {
-                    if (!TileProcessor.get(it.tileID).checkPass(simData, it)) return false
+                    if (!TileProcessor.get(it.tileID).checkPass(simData, it)) {
+                        if (printData) println("[SIM-TRUTH-${truth}] Failing check pass on truth $truth")
+                        return false
+                    }
                 }
             }
 
             // timer stuff
             val checkPassTimer = System.currentTimeMillis()
-            if (printData) println("[SIM] Passed check pass with truth $truth in ${checkPassTimer - mainLoopTime} MS")
+            if (printData) println("[SIM-TRUTH-${truth}] Passed check pass with truth $truth in ${checkPassTimer - mainLoopTime} MS")
         }
 
         return true
