@@ -38,14 +38,12 @@ object Simulator {
             val preprocessTime = System.currentTimeMillis()
             if (printData) println("[SIM-TRUTH-${truth}] Passed preprocess for truth $truth in ${preprocessTime - startTime} MS")
 
-            println("[SIM-TRUTH-${truth}-TICK-${simData.currentTick}] starting with ${simData.tickTasks.size} tick tasks")
             while (simData.tickTasks.size > 0) {
 
                 // while loop until there are no tick tasks left for the current tick
-                println("[SIM-TRUTH-${truth}-TICK-${simData.currentTick}] currently have ${simData.tickTasks.count { it.tick == simData.currentTick }} waiting tasks")
                 while (simData.tickTasks.count { it.tick == simData.currentTick } > 0) {
                     val tasks = simData.tickTasks.filter { it.tick == simData.currentTick }
-                    tasks.forEach {
+                    for (it in tasks) {
                         val result = TileProcessor.get(it.tile.tileID).tickTask(
                             simData,
                             it.tile,
@@ -56,7 +54,7 @@ object Simulator {
                                 specialGet(template.tiles, it.tile.arrIndex + 1, it.tile.index),
                             )
                         )
-                        println("[SIM-TRUTH-${truth}-TICK-${simData.currentTick}] Ticked task for (${it.tile.tileID}, ${it.tile.index} ${it.tile.arrIndex})")
+                        println("[SIM-TRUTH-${truth}-TICK-${simData.currentTick}] Ticked task for (${it.tile.tileID}, (${it.tile.index}, ${it.tile.arrIndex}))")
                         if (!result) {
                             if (printData) println("[SIM-TRUTH-${truth}] Failing on truth $truth")
                             return false
@@ -102,6 +100,7 @@ object Simulator {
 }
 data class TickTask(
     val tile: TileInstance,
+    val tickedBy: TileInstance,
     val tick: Int
 )
 data class SimData(
