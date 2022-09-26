@@ -12,7 +12,7 @@ object Simulator {
             if (printData) println("[SIM-TRUTH-${truth}] Starting simulation for truth $truth")
 
             // build sim data
-            val simData = SimData(truth, 0, mutableListOf(), template)
+            val simData = SimData(truth, 0, mutableListOf(), mutableListOf(), template)
 
             // loop through each time, and run each preprocess function
             template.tiles.forEachIndexed { arrIndex, arr ->
@@ -63,6 +63,12 @@ object Simulator {
                     simData.tickTasks.removeAll(tasks)
                 }
 
+                // run mid run check passes
+                for (it in simData.midRunCheckPass)
+                    if (!TileProcessor.get(it.tileID).checkPass(simData, it))
+                        return false
+                simData.midRunCheckPass.clear()
+
                 // remove any tick tasks that are too old
                 simData.tickTasks.removeIf { it.tick < simData.currentTick }
 
@@ -107,5 +113,6 @@ data class SimData(
     val truth: Int,
     var currentTick: Int,
     val tickTasks: MutableList<TickTask>,
+    val midRunCheckPass: MutableList<TileInstance>,
     val template: Template
 )

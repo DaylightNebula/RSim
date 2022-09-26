@@ -121,11 +121,12 @@ class OutputProcessor: TileProcessor(5) {
     }
 
     override fun tickTask(simData: SimData, me: TileInstance, sides: Array<TileInstance>): Boolean {
-        val truth = simData.template.truths[simData.truth].outputs[me.data]
+        //val truth = simData.template.truths[simData.truth].outputs[me.data]
 
         // only return true if my state equals the truth state
-        println("Output has ${simData.tickTasks.count { it.tick == simData.currentTick }} tick tasks left")
-        return truth == me.state
+        //return truth == me.state
+        if (!simData.midRunCheckPass.contains(me)) simData.midRunCheckPass.add(me)
+        return true
     }
 
     override fun checkPass(simData: SimData, me: TileInstance): Boolean {
