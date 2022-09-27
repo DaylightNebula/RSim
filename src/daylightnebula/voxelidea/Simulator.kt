@@ -1,118 +1,176 @@
 package daylightnebula.voxelidea
 
 object Simulator {
-    val blankTile = TileInstance(0, 0, false, -1, -1)
-
     fun simulate(template: Template, printData: Boolean = false): Boolean {
-        // loop through each truth to run each
-        for (truth in template.truths.indices) {
-
-            // start timer
+        // loop through all potention truths
+        template.truths.forEachIndexed { truthIndex, truth ->
+            // setup timers
+            if (printData) println("[TRUTH-${truthIndex}] Starting simulation!")
             val startTime = System.currentTimeMillis()
-            if (printData) println("[SIM-TRUTH-${truth}] Starting simulation for truth $truth")
 
-            // build sim data
-            val simData = SimData(truth, 0, mutableListOf(), mutableListOf(), template)
+            // create sim data
+            val simData = SimData(template.tiles, truth)
 
-            // loop through each time, and run each preprocess function
-            template.tiles.forEachIndexed { arrIndex, arr ->
-                arr.forEachIndexed { index, tile ->
-                    val success = TileProcessor.get(tile.tileID).preprocess(
-                        simData,
-                        tile,
-                        arrayOf(
-                            specialGet(template.tiles, arrIndex, index - 1),
-                            specialGet(template.tiles, arrIndex, index + 1),
-                            specialGet(template.tiles, arrIndex - 1, index),
-                            specialGet(template.tiles, arrIndex + 1, index),
-                        )
-                    )
-                    if (!success) {
-                        if (printData) println("[SIM-TRUTH-${truth}] Failing pre process on truth $truth")
+            // run preprocess pass ( no braces cause I'm evil >:) )
+            for (arr in simData.tiles)
+                for (tile in arr)
+                    if (!TileProcessor.get(tile.tileID).preprocess(simData, tile, simData.getSides(tile))) {
+                        if (printData) println("[TRUTH-${truthIndex}] Failed in pre-process for (${tile.index}, ${tile.arrIndex})")
+                        return false
+                    }
+
+            // print and update timers
+            val finishedPreProcessTime = System.currentTimeMillis()
+            if (printData) println("[TRUTH-${truthIndex}] Finished preprocess in ${finishedPreProcessTime - startTime} MS")
+
+            // loop until we run out of tick tasks
+            while (simData.waitingTickTasks() > 0) {
+                // loop while we have tick tasks for the current tick
+                while(simData.haveTickTasks()) {
+                    simData.nextTickTasks().forEach {
+                        TileProcessor.get(it.me.tileID).tickTask(simData, it.me, simData.getSides(it.me))
+                    }
+                }
+
+                // run mid-run check pass
+                simData.getMidRunChecks().forEach {
+                    if (!TileProcessor.get(it.tileID).checkPass(simData, it, simData.getSides(it))) {
+                        if (printData) println("[TRUTH-${truthIndex}-TICK-${simData.getTick()}] Failed in mid-run check pass for (${it.index}, ${it.arrIndex})")
                         return false
                     }
                 }
+
+                // tick sim data
+                simData.tick()
             }
 
-            // timer stuff
-            val preprocessTime = System.currentTimeMillis()
-            if (printData) println("[SIM-TRUTH-${truth}] Passed preprocess for truth $truth in ${preprocessTime - startTime} MS")
+            // print and update timers
+            val finishedTickLoopTime = System.currentTimeMillis()
+            if (printData) println("[TRUTH-${truthIndex}] Finished tick loop in ${finishedTickLoopTime - finishedPreProcessTime} MS")
 
-            while (simData.tickTasks.size > 0) {
-
-                // while loop until there are no tick tasks left for the current tick
-                while (simData.tickTasks.count { it.tick == simData.currentTick } > 0) {
-                    val tasks = simData.tickTasks.filter { it.tick == simData.currentTick }
-                    for (it in tasks) {
-                        val result = TileProcessor.get(it.tile.tileID).tickTask(
-                            simData,
-                            it.tile,
-                            arrayOf(
-                                specialGet(template.tiles, it.tile.arrIndex, it.tile.index - 1),
-                                specialGet(template.tiles, it.tile.arrIndex, it.tile.index + 1),
-                                specialGet(template.tiles, it.tile.arrIndex - 1, it.tile.index),
-                                specialGet(template.tiles, it.tile.arrIndex + 1, it.tile.index),
-                            )
-                        )
-                        println("[SIM-TRUTH-${truth}-TICK-${simData.currentTick}] Ticked task for (${it.tile.tileID}, (${it.tile.index}, ${it.tile.arrIndex}))")
-                        if (!result) {
-                            if (printData) println("[SIM-TRUTH-${truth}] Failing on truth $truth")
-                            return false
-                        }
-                    }
-                    simData.tickTasks.removeAll(tasks)
-                }
-
-                // run mid run check passes
-                for (it in simData.midRunCheckPass)
-                    if (!TileProcessor.get(it.tileID).checkPass(simData, it))
-                        return false
-                simData.midRunCheckPass.clear()
-
-                // remove any tick tasks that are too old
-                simData.tickTasks.removeIf { it.tick < simData.currentTick }
-
-                // update current tick
-                simData.currentTick++
-            }
-
-            // timer stuff
-            val mainLoopTime = System.currentTimeMillis()
-            if (printData) println("[SIM-TRUTH-${truth}] Passed main loop for truth $truth in ${mainLoopTime - preprocessTime} MS")
-
-            // check pass loop
-            template.tiles.forEach { arr ->
-                arr.forEach {
-                    if (!TileProcessor.get(it.tileID).checkPass(simData, it)) {
-                        if (printData) println("[SIM-TRUTH-${truth}] Failing check pass on truth $truth")
+            // run final check pass
+            for (arr in simData.tiles)
+                for (tile in arr)
+                    if (!TileProcessor.get(tile.tileID).checkPass(simData, tile, simData.getSides(tile))) {
+                        if (printData) println("[TRUTH-${truthIndex}] Failed final check pass for (${tile.index}, ${tile.arrIndex})")
                         return false
                     }
-                }
-            }
 
-            // timer stuff
-            val checkPassTimer = System.currentTimeMillis()
-            if (printData) println("[SIM-TRUTH-${truth}] Passed check pass with truth $truth in ${checkPassTimer - mainLoopTime} MS")
+            // print and update timers
+            val finishedTime = System.currentTimeMillis()
+            if (printData) println("[TRUTH-${truthIndex}] Finished simulation in ${finishedTime - startTime} MS")
         }
 
         return true
     }
+}
+class SimData(
+    val tiles: Array<Array<TileInstance>>,
+    private val truth: Truth
+) {
+    private val powerStates = Array(tiles.size) { BooleanArray(tiles[0].size) { false } }
+    private val tickTasks = mutableListOf<TickTask>()
+    private val midRunChecks = mutableListOf<TileInstance>()
+    private var currentTick = 0
 
-    fun specialGet(arrs: Array<Array<TileInstance>>, arrIndex: Int, index: Int): TileInstance {
-        if (arrIndex < 0 || arrIndex >= arrs.size) return blankTile
-        if (index < 0 || index >= arrs[0].size) return blankTile
-        return arrs[arrIndex][index]
+    fun getTick(): Int { return currentTick }
+    fun tick() {
+        // remove old tick tasks and mid run checks
+        tickTasks.removeIf { it.tick <= currentTick }
+        midRunChecks.clear()
+
+        // advance counter
+        currentTick++
+    }
+
+    fun addMidRunCheck(tile: TileInstance) {
+        if (!midRunChecks.contains(tile)) midRunChecks.add(tile)
+    }
+
+    fun getMidRunChecks(): List<TileInstance> {
+        return midRunChecks
+    }
+
+    fun addTickTask(task: TickTask) {
+        tickTasks.add(task)
+    }
+
+    fun waitingTickTasks(): Int {
+        return tickTasks.size
+    }
+
+    fun getTickTasks(): List<TickTask> {
+        return tickTasks
+    }
+
+    fun haveTickTasks(): Boolean {
+        return tickTasks.count { it.tick == currentTick } > 0
+    }
+
+    fun nextTickTasks(): List<TickTask> {
+        val out = mutableListOf<TickTask>()
+        tickTasks.removeIf {
+            val result = it.tick == currentTick
+            if (result)
+                out.add(it)
+            result
+        }
+        return out
+    }
+
+    fun getPowerState(arrIndex: Int, index: Int): Boolean? {
+        return if (isPositionValid(arrIndex, index)) powerStates[arrIndex][index] else null
+    }
+
+    fun setPowerState(arrIndex: Int, index: Int, state: Boolean) {
+        if (isPositionValid(arrIndex, index)) powerStates[arrIndex][index] = state
+    }
+
+    fun getTile(arrIndex: Int, index: Int): TileInstance? {
+        return if (isPositionValid(arrIndex, index)) tiles[arrIndex][index] else null
+    }
+
+    fun getSides(tile: TileInstance): List<TileInstance> {
+        return getSides(tile.arrIndex, tile.index)
+    }
+
+    fun getSides(arrIndex: Int, index: Int): List<TileInstance> {
+        val out = mutableListOf(
+            getTile(arrIndex - 1, index),
+            getTile(arrIndex + 1, index),
+            getTile(arrIndex, index - 1),
+            getTile(arrIndex, index + 1)
+        )
+        return out.filterNotNull()
+    }
+
+    fun getSidesWithExtras(arrIndex: Int, index: Int): List<TileInstance> {
+        return listOf<TileInstance?>(
+            getTile(arrIndex - 1, index),
+            getTile(arrIndex + 1, index),
+            getTile(arrIndex - 1, index + 1),
+            getTile(arrIndex + 1, index + 1),
+            getTile(arrIndex - 1, index - 1),
+            getTile(arrIndex + 1, index - 1),
+            getTile(arrIndex, index - 1),
+            getTile(arrIndex, index + 1)
+        ).filterNotNull()
+    }
+
+    fun isPositionValid(arrIndex: Int, index: Int): Boolean {
+        return (arrIndex >= 0 && arrIndex < tiles.size) && (index >= 0 && index < tiles[0].size)
+    }
+
+    fun getInputState(me: TileInstance): Boolean {
+        return truth.inputs[me.data]
+    }
+
+    fun getOutputState(me: TileInstance): Boolean {
+        return truth.outputs[me.data]
     }
 }
 data class TickTask(
-    val tile: TileInstance,
+    val me: TileInstance,
     val tickedBy: TileInstance,
     val tick: Int
-)
-data class SimData(
-    val truth: Int,
-    var currentTick: Int,
-    val tickTasks: MutableList<TickTask>,
-    val midRunCheckPass: MutableList<TileInstance>,
-    val template: Template
 )

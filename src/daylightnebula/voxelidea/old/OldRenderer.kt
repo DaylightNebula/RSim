@@ -1,4 +1,4 @@
-package daylightnebula.voxelidea
+package daylightnebula.voxelidea.old
 
 import java.awt.Color
 import java.awt.Graphics

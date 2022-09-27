@@ -61,7 +61,7 @@ fun loadTemplate(file: File): Template {
                     // yes I know this is a mess, just go with it
                     currentTemplate.add(
                         tokens.mapIndexed { index, it ->
-                            TileInstance(it.first().digitToInt(), it.last().digitToInt(), false, currentTemplate.size, index)
+                            TileInstance(it.first().digitToInt(), it.last().digitToInt(), currentTemplate.size, index)
                         }.toTypedArray()
                     )
                 }
