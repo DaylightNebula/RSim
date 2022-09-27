@@ -1,11 +1,16 @@
 package daylightnebula.voxelidea
 
+import java.awt.Color
+import java.awt.Dimension
+import javax.swing.JFrame
+
 object Simulator {
-    fun simulate(template: Template, printData: Boolean = false): Boolean {
+    fun simulate(template: Template, printData: Boolean = false, displayFrames: Boolean = false): Boolean {
         // loop through all potention truths
         template.truths.forEachIndexed { truthIndex, truth ->
             // setup timers
             if (printData) println("[TRUTH-${truthIndex}] Starting simulation!")
+            if (displayFrames) createWindow(template, truthIndex)
             val startTime = System.currentTimeMillis()
 
             // create sim data
@@ -16,6 +21,7 @@ object Simulator {
                 for (tile in arr)
                     if (!TileProcessor.get(tile.tileID).preprocess(simData, tile, simData.getSides(tile))) {
                         if (printData) println("[TRUTH-${truthIndex}] Failed in pre-process for (${tile.index}, ${tile.arrIndex})")
+                        if (displayFrames) closeWindow()
                         return false
                     }
 
@@ -27,15 +33,23 @@ object Simulator {
             while (simData.waitingTickTasks() > 0) {
                 // loop while we have tick tasks for the current tick
                 while(simData.haveTickTasks()) {
-                    simData.nextTickTasks().forEach {
-                        TileProcessor.get(it.me.tileID).tickTask(simData, it.me, simData.getSides(it.me))
+                    for (it in simData.nextTickTasks()) {
+                        TileProcessor.get(it.me.tileID).tickTask(simData, it.me, it.tickedBy, simData.getSides(it.me))
+
+                        if (displayFrames) {
+                            win.title = "Truth ${truthIndex}, Tick ${simData.getTick()}"
+                            drawTiles(simData, it.me)
+                            System.`in`.read()
+                            //Thread.sleep(2000)
+                        }
                     }
                 }
 
                 // run mid-run check pass
                 simData.getMidRunChecks().forEach {
                     if (!TileProcessor.get(it.tileID).checkPass(simData, it, simData.getSides(it))) {
-                        if (printData) println("[TRUTH-${truthIndex}-TICK-${simData.getTick()}] Failed in mid-run check pass for (${it.index}, ${it.arrIndex})")
+                        if (printData) println("[TRUTH-${truthIndex}-TICK-${simData.getTick()}] Failed in mid-run check pass for (${it.index}, ${it.arrIndex}) with power state ${simData.getPowerState(it.arrIndex, it.index)}")
+                        if (displayFrames) closeWindow()
                         return false
                     }
                 }
@@ -53,15 +67,62 @@ object Simulator {
                 for (tile in arr)
                     if (!TileProcessor.get(tile.tileID).checkPass(simData, tile, simData.getSides(tile))) {
                         if (printData) println("[TRUTH-${truthIndex}] Failed final check pass for (${tile.index}, ${tile.arrIndex})")
+                        if (displayFrames) closeWindow()
                         return false
                     }
 
             // print and update timers
             val finishedTime = System.currentTimeMillis()
             if (printData) println("[TRUTH-${truthIndex}] Finished simulation in ${finishedTime - startTime} MS")
+            if (displayFrames) closeWindow()
         }
 
         return true
+    }
+
+    val tileWidth = 50
+    lateinit var win: JFrame
+    fun createWindow(template: Template, truthIndex: Int) {
+        win = JFrame("Truth ${truthIndex}")
+        win.defaultCloseOperation = JFrame.EXIT_ON_CLOSE
+        win.size = Dimension(template.tiles[0].size * tileWidth, template.tiles.size * tileWidth)
+        win.isVisible = true
+    }
+
+    fun drawTiles(simData: SimData, vararg tiles: TileInstance) {
+        win.graphics.clearRect(0, 0, win.width, win.height)
+
+        for (arr in simData.tiles)
+            for (tile in arr) {
+                val x = tile.index * tileWidth
+                val y = tile.arrIndex * tileWidth
+
+                TileProcessor.get(tile.tileID).draw(
+                    win.graphics,
+                    x,
+                    y,
+                    tileWidth,
+                    tileWidth
+                )
+
+                if (simData.getPowerState(tile.arrIndex, tile.index) == true) {
+                    win.graphics.color = Color.green
+                    win.graphics.drawRect(x, y, tileWidth, tileWidth)
+                }
+            }
+
+        tiles.forEach { tile ->
+            val x = tile.index * tileWidth
+            val y = tile.arrIndex * tileWidth
+
+            win.graphics.color = Color.green
+            win.graphics.fillRect(x, y, tileWidth / 4, tileWidth / 4)
+        }
+    }
+
+    fun closeWindow() {
+        win.isVisible = false
+        win.dispose()
     }
 }
 class SimData(

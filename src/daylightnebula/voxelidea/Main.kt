@@ -90,7 +90,7 @@ fun loadTemplate(file: File): Template {
 fun main() {
     val templateFile = File(System.getProperty("user.dir"), "res/test_design.rstemplate")
     val template = loadTemplate(templateFile)
-    val result = Simulator.simulate(template, true)
+    val result = Simulator.simulate(template, printData = true, displayFrames = false)
     if (result)
         println("Passed! :)")
     else
