@@ -29,6 +29,7 @@ object Simulator {
             val finishedPreProcessTime = System.currentTimeMillis()
             if (printData) println("[TRUTH-${truthIndex}] Finished preprocess in ${finishedPreProcessTime - startTime} MS")
 
+            var failsafeCounter = 0
             // loop until we run out of tick tasks
             while (simData.waitingTickTasks() > 0) {
                 // loop while we have tick tasks for the current tick
@@ -41,6 +42,12 @@ object Simulator {
                             drawTiles(simData, it.me)
                             System.`in`.read()
                             //Thread.sleep(2000)
+                        }
+
+                        failsafeCounter++
+                        if (failsafeCounter > 10000) {
+                            println("[TRUTH-${truthIndex}] Failed due to timeout")
+                            return false
                         }
                     }
                 }
