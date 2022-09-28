@@ -29,6 +29,7 @@ object Simulator {
             val finishedPreProcessTime = System.currentTimeMillis()
             if (printData) println("[TRUTH-${truthIndex}] Finished preprocess in ${finishedPreProcessTime - startTime} MS")
 
+            var skipDisplay = false
             var failsafeCounter = 0
             // loop until we run out of tick tasks
             while (simData.waitingTickTasks() > 0) {
@@ -37,10 +38,11 @@ object Simulator {
                     for (it in simData.nextTickTasks()) {
                         TileProcessor.get(it.me.tileID).tickTask(simData, it.me, it.tickedBy, simData.getSides(it.me))
 
-                        if (displayFrames) {
+                        if (displayFrames && !skipDisplay) {
                             win.title = "Truth ${truthIndex}, Tick ${simData.getTick()}"
-                            drawTiles(simData, it.me)
-                            System.`in`.read()
+                            drawTiles(simData, it)
+                            val input = System.`in`.read()
+                            if (input == 48) skipDisplay = true
                             //Thread.sleep(2000)
                         }
 
@@ -96,7 +98,7 @@ object Simulator {
         win.isVisible = true
     }
 
-    fun drawTiles(simData: SimData, vararg tiles: TileInstance) {
+    fun drawTiles(simData: SimData, task: TickTask) {
         win.graphics.clearRect(0, 0, win.width, win.height)
 
         for (arr in simData.tiles)
@@ -118,13 +120,18 @@ object Simulator {
                 }
             }
 
-        tiles.forEach { tile ->
+        // draw tick task boxes
+        win.graphics.color = Color.GREEN
+        win.graphics.fillRect(task.me.index * tileWidth, task.me.arrIndex * tileWidth, tileWidth / 4, tileWidth / 4)
+        win.graphics.color = Color.RED
+        win.graphics.fillRect(task.tickedBy.index * tileWidth, task.tickedBy.arrIndex * tileWidth, tileWidth / 4, tileWidth / 4)
+        /*tiles.forEach { tile ->
             val x = tile.index * tileWidth
             val y = tile.arrIndex * tileWidth
 
             win.graphics.color = Color.green
             win.graphics.fillRect(x, y, tileWidth / 4, tileWidth / 4)
-        }
+        }*/
     }
 
     fun closeWindow() {
@@ -136,6 +143,8 @@ class SimData(
     val tiles: Array<Array<TileInstance>>,
     private val truth: Truth
 ) {
+    // TODO is powered table, if value is true, power state cannot be overriden but tick tasks are still called
+    private val powerSources = Array(tiles.size) { Array(tiles[0].size) { mutableListOf<TileInstance>() } }
     private val powerStates = Array(tiles.size) { BooleanArray(tiles[0].size) { false } }
     private val tickTasks = mutableListOf<TickTask>()
     private val midRunChecks = mutableListOf<TileInstance>()
@@ -191,7 +200,14 @@ class SimData(
     }
 
     fun setPowerState(arrIndex: Int, index: Int, state: Boolean) {
-        if (isPositionValid(arrIndex, index)) powerStates[arrIndex][index] = state
+        if (isPositionValid(arrIndex, index)) {
+            // is powered by source check
+            val powerSources = getPowerSources(arrIndex, index)!!
+            if (powerSources.isNotEmpty() && !state)
+                return
+
+            powerStates[arrIndex][index] = state
+        }
     }
 
     fun getTile(arrIndex: Int, index: Int): TileInstance? {
@@ -235,6 +251,24 @@ class SimData(
 
     fun getOutputState(me: TileInstance): Boolean {
         return truth.outputs[me.data]
+    }
+
+    fun getPowerSources(arrIndex: Int, index: Int): List<TileInstance>? {
+        return if (isPositionValid(arrIndex, index)) powerSources[arrIndex][index]
+        else null
+    }
+
+    fun setPowerSourceState(arrIndex: Int, index: Int, source: TileInstance, state: Boolean) {
+        if (isPositionValid(arrIndex, index)) {
+            val targetList = powerSources[arrIndex][index]
+            if (state && !targetList.contains(source)) targetList.add(source)
+            else if (!state && targetList.contains(source)) targetList.remove(source)
+
+            // if wire, do the same for the block below
+            if (tiles[arrIndex][index].tileID == 1) {
+                setPowerSourceState(arrIndex + 1, index, source, state)
+            }
+        }
     }
 }
 data class TickTask(

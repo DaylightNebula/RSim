@@ -48,7 +48,7 @@ class BlockProcessor: TileProcessor(6, 1, 0) {
         val myPowerState = simData.getPowerState(me.arrIndex, me.index) ?: return
         sides.forEach {  tile ->
             if (tile.tileID == 2) {
-                if (me.arrIndex + 1 == tile.tileID) return@forEach
+                if (me.arrIndex + 1 == tile.arrIndex) return@forEach
                 simData.setPowerState(tile.arrIndex, tile.index, myPowerState)
                 simData.addTickTask(TickTask(tile, me, simData.getTick()))
             }
@@ -77,7 +77,8 @@ class WireProcessor: TileProcessor(1, 2, 0) {
                 && simData.getPowerState(it.arrIndex, it.index) != myPowerState
                 && it != tickedBy
             ) {
-                if ((me.arrIndex - it.arrIndex).absoluteValue + (me.index - it.arrIndex).absoluteValue > 1 && it.tileID != 1) return@forEach
+                val totalOffset = (me.arrIndex - it.arrIndex).absoluteValue + (me.index - it.index).absoluteValue
+                if (totalOffset > 1 && it.tileID != 1) return@forEach
                 simData.setPowerState(it.arrIndex, it.index, myPowerState)
                 simData.addTickTask(TickTask(it, me, simData.getTick()))
             }
@@ -100,6 +101,7 @@ class InverterProcessor: TileProcessor(2, 3, 0) {
         sides.forEach {
             if (it.arrIndex + 1 == me.arrIndex && it.tileID != 6) return@forEach
             if ((it.arrIndex - 1 == me.arrIndex || it.arrIndex == me.arrIndex) && it.tileID != 1) return@forEach
+            simData.setPowerSourceState(it.arrIndex, it.index, me, true)
             simData.setPowerState(it.arrIndex, it.index, true)
             simData.addTickTask(TickTask(it, me, simData.getTick()))
         }
@@ -110,6 +112,7 @@ class InverterProcessor: TileProcessor(2, 3, 0) {
         sides.forEach {
             if (it.tileID != 1 && it.tileID != 6) return@forEach
             if (it.tileID == 6 && it.arrIndex >= me.arrIndex) return@forEach
+            simData.setPowerSourceState(it.arrIndex, it.index, me, !myPowerState)
             simData.setPowerState(it.arrIndex, it.index, !myPowerState)
             simData.addTickTask(TickTask(it, me, simData.getTick()))
         }
