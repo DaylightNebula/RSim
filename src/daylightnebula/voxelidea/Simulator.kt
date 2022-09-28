@@ -143,7 +143,6 @@ class SimData(
     val tiles: Array<Array<TileInstance>>,
     private val truth: Truth
 ) {
-    // TODO is powered table, if value is true, power state cannot be overriden but tick tasks are still called
     private val powerSources = Array(tiles.size) { Array(tiles[0].size) { mutableListOf<TileInstance>() } }
     private val powerStates = Array(tiles.size) { BooleanArray(tiles[0].size) { false } }
     private val tickTasks = mutableListOf<TickTask>()
